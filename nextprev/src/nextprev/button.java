@@ -3,71 +3,99 @@ package nextprev;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import javax.swing.JButton;
 import javax.swing.JFrame;
-import javax.swing.JLabel;
 import javax.swing.JTable;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import koneksi.koneksi;
+import javax.swing.JButton;
+import javax.swing.JLabel;
 
-public class button extends JFrame {
-    private JButton nextButton;
-    private JButton prevButton;
-    private int currentPage = 1;
-    private final int rowsPerPage = 3; // Assuming 3 rows per page
-    private int totalEntries;
+    public class button extends JFrame {
+        private JButton nextButton;
+        private JButton prevButton;
+        private int currentPage = 1;
+        private final int rowsPerPage = 3; // Assuming 3 rows per page
+        private int totalEntries;
+        private JLabel totalEntriesLabel;
     
     public button(JButton next, JButton prev) {
         initComponents();
         this.nextButton = next;
         this.prevButton = prev;
+        this.totalEntriesLabel = totalEntriesLabel; // Assign the JLabel
         loadAttendanceData();
         setPaginationLabel();
         nextButton.addActionListener(e -> nextActionPerformed(e));
         prevButton.addActionListener(e -> prevActionPerformed(e));
+        this.totalEntriesLabel = totalEntriesLabel; // Assign the JLabel
     }
     
-    private void loadAttendanceData() {
-        DefaultTableModel timeInModel = new DefaultTableModel();
-        timeInModel.addColumn("ID");
-        timeInModel.addColumn("Jam Masuk");
-        timeInModel.addColumn("Nama Pegawai");
-        timeInModel.addColumn("Status");
+private void loadAttendanceData() {
+    DefaultTableModel timeInModel = new DefaultTableModel();
+    timeInModel.addColumn("ID");
+    timeInModel.addColumn("Jam Masuk");
+    timeInModel.addColumn("Nama Pegawai");
+    timeInModel.addColumn("Status");
 
-        try {
-            int offset = (currentPage - 1) * rowsPerPage;
-            String sql = "SELECT absensi.id_absensi, absensi.time_in, user.Username, absensi.status_absensi " +
-                    "FROM absensi " +
-                    "JOIN user ON absensi.id_user = user.id_user LIMIT ?, ?";
-            try (Connection conn = koneksi.configDB();
-                 PreparedStatement pstmt = conn.prepareStatement(sql)) {
-                pstmt.setInt(1, offset);
-                pstmt.setInt(2, rowsPerPage);
-                try (ResultSet res = pstmt.executeQuery()) {
-                    while (res.next()) {
-                        String idAbsensi = res.getString("id_absensi");
-                        String waktuAbsensi = res.getString("time_in");
-                        String namaPegawai = res.getString("Username");
-                        String statusAbsensi = res.getString("status_absensi");
+    try {
+        int offset = (currentPage - 1) * rowsPerPage;
+        String dataSql = "SELECT absensi.id_absensi, absensi.time_in, user.Username, absensi.status_absensi " +
+                "FROM absensi " +
+                "JOIN user ON absensi.id_user = user.id_user LIMIT ?, ?";
+        String countSql = "SELECT COUNT(*) AS totalRows FROM absensi"; // SQL to get total row count
+        try (Connection conn = koneksi.configDB();
+             PreparedStatement dataStmt = conn.prepareStatement(dataSql);
+             PreparedStatement countStmt = conn.prepareStatement(countSql)) {
 
-                        // Extracting time in "HH:mm" format from datetime string
-                        String timeIn = waktuAbsensi.substring(11, 16);
-
-                        timeInModel.addRow(new Object[]{idAbsensi, timeIn, namaPegawai, statusAbsensi});
-                    }
+            // Execute query to get total row count
+            try (ResultSet countResult = countStmt.executeQuery()) {
+                if (countResult.next()) {
+                    totalEntries = countResult.getInt("totalRows");
                 }
             }
-            timein.setModel(timeInModel);
-            setTableAlignment(timein);
-        } catch (Exception e) {
-            handleException("Error loading time in data", e);
+
+            dataStmt.setInt(1, offset);
+            dataStmt.setInt(2, rowsPerPage);
+            try (ResultSet res = dataStmt.executeQuery()) {
+                while (res.next()) {
+                    String idAbsensi = res.getString("id_absensi");
+                    String waktuAbsensi = res.getString("time_in");
+                    String namaPegawai = res.getString("Username");
+                    String statusAbsensi = res.getString("status_absensi");
+
+                    // Extracting time in "HH:mm" format from datetime string
+                    String timeIn = waktuAbsensi.substring(11, 16);
+
+                    timeInModel.addRow(new Object[]{idAbsensi, timeIn, namaPegawai, statusAbsensi});
+                }
+            }
         }
+        timein.setModel(timeInModel);
+        setTableAlignment(timein);
+
+        // Update total entries label
+        updateTotalEntriesLabel(offset, timeInModel.getRowCount());
+    } catch (Exception e) {
+        handleException("Error loading time in data", e);
     }
+}
+
+private void updateTotalEntriesLabel(int startRow, int endRow) {
+    // Calculate the actual start row and end row based on the current page and rows per page
+    startRow = Math.min(Math.max((currentPage - 1) * rowsPerPage + 1, 1), totalEntries);
+    endRow = Math.min(startRow + rowsPerPage - 1, totalEntries);
+
+    total.setText("Showing " + startRow + " to " + endRow + " of " + totalEntries + " entries");
+}
 
     private void setPaginationLabel() {
         num1.setText(String.valueOf(currentPage));
     }
+    
+    private int getMaxPage() {
+    return (int) Math.ceil((double) totalEntries / rowsPerPage);
+}
 
     private void setTableAlignment(JTable table) {
         DefaultTableCellRenderer centerRenderer = new DefaultTableCellRenderer();
@@ -96,7 +124,6 @@ public class button extends JFrame {
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
         setMinimumSize(new java.awt.Dimension(438, 270));
-        setPreferredSize(new java.awt.Dimension(455, 290));
         getContentPane().setLayout(new org.netbeans.lib.awtextra.AbsoluteLayout());
 
         total.setText("-");
@@ -151,9 +178,11 @@ public class button extends JFrame {
     }// </editor-fold>//GEN-END:initComponents
 
     private void nextActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_nextActionPerformed
-    currentPage++;
-    loadAttendanceData();
-    setPaginationLabel();
+    if (currentPage < getMaxPage()) { // Check if currentPage is less than the maximum page
+        currentPage++;
+        loadAttendanceData();
+        setPaginationLabel();
+    }
     }//GEN-LAST:event_nextActionPerformed
 
     private void prevActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_prevActionPerformed
@@ -163,7 +192,7 @@ public class button extends JFrame {
         setPaginationLabel();
     }
     }//GEN-LAST:event_prevActionPerformed
-    public static void main(String args[]) {
+        public static void main(String args[]) {
         JButton next = new JButton("Next");
         JButton prev = new JButton("Previous");
         java.awt.EventQueue.invokeLater(new Runnable() {
