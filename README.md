@@ -34,4 +34,12 @@ To use this pagination functionality in your Java Swing application:
 3. Customize the `loadAttendanceData` method to fetch data from your database or data source.
 4. Modify the table columns and row data as needed to suit your application's requirements.
 
-Feel free to explore and extend this pagination functionality to suit your needs!
+## What's New?
+
+- Added `updateTotalEntriesLabel` method for updating the label that displays information about the range of entries being displayed and the total number of entries.
+
+![nextprev](https://github.com/pakelcomedy/nextprev/assets/92992500/d30d1ad8-d5f9-43fa-a191-200be3b97f6e)
+
+Feel free to raise any issues or ask questions
+
+---
